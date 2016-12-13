@@ -1,0 +1,569 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+
+    "Description" : "CloudFormation template to create a MapR Cluster for AWS Marketplace",
+
+    "Parameters" : {
+  
+       "ClusterNodeType" : {
+           "Type" : "String",
+           "Default" : "d2.xlarge",
+           "Description" : "Instance Type for MapR Cluster nodes; select m3/m4 or i2 instance types for us-west-1 and sa-east-1",
+           "AllowedValues" : [ "m3.large", "m3.xlarge", "m4.2xlarge", "m4.4xlarge", "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge", "i2.xlarge", "i2.2xlarge" ]
+,
+            "ConstraintDescription" : "Must be a valid EC2 instance type."
+        },
+        "InstanceSpotPrice": 
+        {
+            "Type": "String",
+            "Default" : "0.00",
+            "Description": "Spot Price to bid for requested instances (0.00 will result in using on-demand instances)",
+            "AllowedPattern" : "([0-9]{1}[.]{1}[0-9]{2})",
+            "ConstraintDescription" : "Must be decimal numeric value"
+        },
+
+        "PersistentStorage": {
+          "Type": "Number",
+          "Default": "0",
+          "Description" : "Allocated EBS storage for each block device (in GB; 4 devs per node); 0 indicates ephemeral storage only",
+          "MinValue": "0",
+          "MaxValue": "1024",
+          "ConstraintDescription" : "No more than 1024 GB per device (4 TB per node)."
+        },
+
+        "KeyName": 
+        {
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "Description": "Name of an existing EC2 KeyPair within the AWS account; all instances will launch with this KeyPair",
+            "MinLength": "1"
+        },
+
+        "ClusterName": 
+        {
+            "Type": "String",
+            "Default" : "awsmk", 
+            "Description": "MapR Cluster ID",
+            "AllowedPattern" : "([A-Za-z]{1}[0-9A-Za-z_-]*)",
+            "ConstraintDescription" : "The ClusterName value must be alphanumeric"
+        },
+
+        "MapREdition": 
+        {
+            "Type": "String",
+            "Default" : "Converged Community", 
+            "Description": "MapR Software Edition; you MUST authorize access to the proper AMI at https://aws.amazon.com/marketplace/search/results/ref=lbr_navgno_search_box?page=1&searchTerms=mapr",
+            "AllowedValues" : [ "Converged Community" ],
+            "ConstraintDescription" : "Select Converged Community, Enterprise, or Converged Enterprise Edition"
+        },
+
+        "MapRSecurity" :
+        {
+            "Type" : "String",
+            "Default" : "Disabled",
+            "Description" : "Enable MapR native strong authentication for cluster access",
+            "AllowedValues" : [ "Disabled", "Enabled" ]
+        },
+
+        "MapRVersion" :
+        {
+            "Type" : "String",
+            "Default" : "5.2.0",
+            "Description" : "MapR Software Version; EBF suffix triggers installation of latest customer patch",
+            "AllowedValues" : [ "5.2.0" ],
+            "ConstraintDescription" : "Supported versions of MapR within AWS Marketplace"
+        },
+
+        "VpcSubnetId" :
+        {
+          "Type" : "String",
+          "Default" : "subnet-00000000",
+          "Description" : "VPC Subnet for cluster deployment; specifying subnet-0000000 will result in new VPC being created",
+          "AllowedPattern" : "subnet-(\\w{8})",
+          "ConstraintDescription" : "must be a valid AWS subnet (subnet-xxxxxxx}"
+        },
+
+        "RemoteAccessCIDR" :
+        {
+          "Type" : "String",
+          "Default" : "0.0.0.0/0",
+          "Description" : "For newly created VPC's, allow inbound network traffic from this address range (0.0.0.0/0 will allow all)",
+          "MinLength": "9",
+          "MaxLength": "18",
+          "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+          "ConstraintDescription" : "must be a valid CIDR range of the form x.x.x.x/x"
+        },
+   
+        "ClusterInstanceCount" : {
+           "Description" : "Size of MapR cluster",
+           "Type" : "Number",
+           "Default" : "3",
+           "MinValue" : "1",
+           "MaxValue" : "99"
+        }
+    
+    },
+
+    "Mappings" : 
+    {
+        "MapRVersion2Vindex" : {
+          "4.1.0"       : { "Vindex" : "410"  },
+          "4.1.0-EBF"   : { "Vindex" : "410"  },
+          "5.0.0"       : { "Vindex" : "500"  },
+          "5.0.0-EBF"   : { "Vindex" : "500"  },
+          "5.1.0"       : { "Vindex" : "510"  },
+          "5.1.0-EBF"   : { "Vindex" : "510"  },
+          "5.2.0"       : { "Vindex" : "520"  }
+        },
+
+        "AWSRegionVindex2AMI" : {
+          "us-east-1"      : { "410" : "ami-262b6a4c", "500" : "ami-a39fccc9", "510" : "ami-ea9e18fd", "520" : "ami-ca4533dd", "Windows2012r2" : "ami-none" },
+          "us-west-1"      : { "410" : "ami-5e442d3e", "500" : "ami-d6553fb6", "510" : "ami-a93670c9", "520" : "ami-none", "Windows2012r2" : "ami-none" },
+          "us-west-2"      : { "410" : "ami-870f1ce6", "500" : "ami-c6332aa7", "510" : "ami-26915246", "520" : "ami-none", "Windows2012r2" : "ami-none" },
+          "eu-central-1"   : { "410" : "ami-9bafbdf7", "500" : "ami-5b213e37", "510" : "ami-301cf65f", "520" : "ami-none", "Windows2012r2" : "ami-none" },
+          "eu-west-1"      : { "410" : "ami-93a206e0", "500" : "ami-d712bea4", "510" : "ami-5da9ce2e", "520" : "ami-none", "Windows2012r2" : "ami-none" },
+          "ap-southeast-1" : { "410" : "ami-1238f971", "500" : "ami-9736f4f4", "510" : "ami-a027fac3", "520" : "ami-none", "Windows2012r2" : "ami-none" },
+          "ap-southeast-2" : { "410" : "ami-d7ca93b4", "500" : "ami-da346eb9", "510" : "ami-62b09b01", "520" : "ami-none", "Windows2012r2" : "ami-none" },
+          "ap-northeast-1" : { "410" : "ami-2aebc644", "500" : "ami-69013707", "510" : "ami-6226db03", "520" : "ami-none", "Windows2012r2" : "ami-none" },
+          "sa-east-1"      : { "410" : "ami-00a6236c", "500" : "ami-ab38bfc7", "510" : "ami-bc9400d0", "520" : "ami-none", "Windows2012r2" : "ami-none" }
+        },
+
+        "SubnetConfig" : 
+        {
+          "VPC"         : { "CIDR" : "10.9.0.0/16" },
+          "Public"      : { "CIDR" : "10.9.1.0/24" },
+          "MySQLDB"     : { "CIDR" : "10.9.2.0/24" }
+        }
+    },
+  
+    "Conditions" : {
+       "EnableWaitConditions" : { "Fn::Equals" : [ "1" , "1" ] },
+       "EphemeralStorage" : { "Fn::Equals" : [ { "Ref" : "PersistentStorage" } , "0" ] },
+       "OnDemandInstances" : { "Fn::Equals" : [ { "Ref" : "InstanceSpotPrice" } , "0.00" ] },
+       "NewPrivateVPC" : { "Fn::Equals" : [ { "Ref" : "VpcSubnetId" } , "subnet-00000000" ] }
+    },
+
+    "Resources" : {
+
+      "VPC" : 
+      {
+        "Type" : "AWS::EC2::VPC",
+        "Condition" : "NewPrivateVPC",
+        "Properties" : 
+        {
+          "CidrBlock" : { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ]},
+          "EnableDnsHostnames" : "true",
+          "EnableDnsSupport" : "true",
+          "Tags" : [ {"Key" : "Application", "Value" : "MapR Marketplace Deploymnent"  } ]
+        }
+      },
+
+      "InternetGateway" : 
+      {
+        "Type" : "AWS::EC2::InternetGateway",
+        "Condition" : "NewPrivateVPC"
+      },
+
+      "AttachGateway" : 
+      {
+        "Type" : "AWS::EC2::VPCGatewayAttachment",
+        "Condition" : "NewPrivateVPC",
+        "Properties" : 
+        {
+          "VpcId" : { "Ref" : "VPC" },
+          "InternetGatewayId" : { "Ref" : "InternetGateway" }
+        }
+      },
+
+      "PublicSubnet" : 
+      {
+        "Type" : "AWS::EC2::Subnet",
+        "Condition" : "NewPrivateVPC",
+        "Properties" : 
+        {
+            "VpcId" : { "Ref" : "VPC" },
+            "CidrBlock" : { "Fn::FindInMap" : [ "SubnetConfig", "Public", "CIDR" ]},
+            "Tags" : [
+              {"Key" : "Application", "Value" : "MapR" },
+              {"Key" : "Network", "Value" : "Public" }
+            ]
+        }
+      },
+
+      "PublicRouteTable" : {
+        "Type" : "AWS::EC2::RouteTable",
+        "Condition" : "NewPrivateVPC",
+        "Properties" : {
+          "VpcId" : { "Ref" : "VPC" }
+        }
+      },
+
+      "PublicRoute" : {
+        "Type" : "AWS::EC2::Route",
+        "Condition" : "NewPrivateVPC",
+        "DependsOn" : "AttachGateway",
+        "Properties" : {
+          "RouteTableId" : { "Ref" : "PublicRouteTable" },
+          "DestinationCidrBlock" : "0.0.0.0/0",
+          "GatewayId" : { "Ref" : "InternetGateway" }
+        }
+      },
+
+      "PublicSubnetRouteTableAssociation" : {
+        "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+        "Condition" : "NewPrivateVPC",
+        "Properties" : {
+          "SubnetId" : { "Ref" : "PublicSubnet" },
+          "RouteTableId" : { "Ref" : "PublicRouteTable" }
+        }
+      },
+
+      "DefaultSecurityGroup" : {
+        "Type" : "AWS::EC2::SecurityGroup",
+        "Condition" : "NewPrivateVPC",
+        "Properties" : {
+          "GroupDescription" : "Default Security group for all the Nodes",
+          "VpcId" : {"Ref" : "VPC"},
+          "SecurityGroupIngress" : [
+            { "IpProtocol" : "icmp", "FromPort" : "-1", "ToPort" : "-1", "CidrIp" : { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ]} },
+            { "IpProtocol" : "tcp", "FromPort" : "0", "ToPort" : "65535", "CidrIp" : { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ]} },
+            { "IpProtocol" : "udp", "FromPort" : "0", "ToPort" : "65535", "CidrIp" : { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ]} },
+            { "IpProtocol" : "tcp", "FromPort" : "8443", "ToPort" : "8443", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "3000", "ToPort" : "3000", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "4242", "ToPort" : "4242", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "5601", "ToPort" : "5601", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "8088", "ToPort" : "8088", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "8042", "ToPort" : "8042", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "19888", "ToPort" : "19888", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "8047", "ToPort" : "8047", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "31010", "ToPort" : "31010", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "10000", "ToPort" : "10000", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "9443", "ToPort" : "9443", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "2049", "ToPort" : "2049", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "111", "ToPort" : "111", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "udp", "FromPort" : "111", "ToPort" : "111", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } },
+            { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : { "Ref" : "RemoteAccessCIDR" } } 
+          ]
+        }
+      },
+
+    "InstanceIAMRole": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [{
+            "Action": [ "sts:AssumeRole" ], 
+            "Effect": "Allow", 
+            "Principal": { "Service": [ "ec2.amazonaws.com" ] }
+          }], 
+          "Version": "2012-10-17"
+        }, 
+        "Path": "/", 
+        "Policies": [{
+          "PolicyDocument": {
+            "Statement": [{
+              "Action": [ 
+                "ec2:CreateTags", 
+                "ec2:DescribeInstances", 
+                "cloudformation:DescribeStackResources", 
+                "s3:Get*" , 
+                "s3:List*" 
+              ], 
+              "Effect": "Allow", 
+              "Resource": "*"
+            }]
+          }, 
+          "PolicyName": "DescribeAccessEC2andCFN"
+        }]
+      }, 
+      "Type": "AWS::IAM::Role"
+    },
+
+    "InstanceProfile": {
+      "Properties": {
+        "Path": "/", 
+        "Roles": [{ "Ref": "InstanceIAMRole" } ]
+      }, 
+      "Type": "AWS::IAM::InstanceProfile"
+    },   
+
+    "ClusterCompleteHandle" : {
+        "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "ClusterCompleteCondition" : {
+        "Type" : "AWS::CloudFormation::WaitCondition",
+        "DependsOn" : "ClusterNodes",
+        "Properties" : {
+           "Handle"  : { "Ref" : "ClusterCompleteHandle" },
+           "Timeout" : "2400",
+           "Count"   : { "Ref" : "ClusterInstanceCount" }
+        }
+    },
+
+    "ClientSpecWaitHandle" : {
+        "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "ClientSpecWaitCondition" : {
+        "Type" : "AWS::CloudFormation::WaitCondition",
+        "Condition" : "EnableWaitConditions",
+        "DependsOn" : "ClusterCompleteCondition",
+        "Properties" : {
+           "Handle"  : { "Ref" : "ClientSpecWaitHandle" },
+           "Timeout" : "120",
+           "Count"   : "1"
+        }
+    },
+
+    "MCSWaitHandle" : {
+        "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "MCSWaitCondition" : {
+        "Type" : "AWS::CloudFormation::WaitCondition",
+        "Condition" : "EnableWaitConditions",
+        "DependsOn" : "ClusterCompleteCondition",
+        "Properties" : {
+           "Handle"  : { "Ref" : "MCSWaitHandle" },
+           "Timeout" : "120",
+           "Count"   : "1"
+        }
+    },
+
+    "DrillWaitHandle" : {
+        "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "DrillWaitCondition" : {
+        "Type" : "AWS::CloudFormation::WaitCondition",
+        "Condition" : "EnableWaitConditions",
+        "DependsOn" : "ClusterCompleteCondition",
+        "Properties" : {
+           "Handle"  : { "Ref" : "DrillWaitHandle" },
+           "Timeout" : "120",
+           "Count"   : "1"
+        }
+    },
+
+    "MonWaitHandle" : {
+        "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "MonWaitCondition" : {
+        "Type" : "AWS::CloudFormation::WaitCondition",
+        "Condition" : "EnableWaitConditions",
+        "DependsOn" : "ClusterCompleteCondition",
+        "Properties" : {
+           "Handle"  : { "Ref" : "MonWaitHandle" },
+           "Timeout" : "240",
+           "Count"   : "1"
+        }
+    },
+
+    "ClusterNodes" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "VPCZoneIdentifier" : [ { "Fn::If" : [ "NewPrivateVPC", { "Ref" : "PublicSubnet" }, {"Ref" : "VpcSubnetId"} ] } ],
+        "LaunchConfigurationName" : { "Ref" : "ClusterNodeLaunchConfig" },
+        "MinSize" : 0,
+        "MaxSize" : { "Ref" : "ClusterInstanceCount" },
+        "DesiredCapacity" : { "Ref" : "ClusterInstanceCount" }
+      },
+      "CreationPolicy": {
+        "ResourceSignal": {
+          "Count": { "Ref" : "ClusterInstanceCount" },
+          "Timeout": "PT90M"
+        }
+      }       
+    },
+    
+    "ClusterNodeLaunchConfig"  : {
+        "Type" : "AWS::AutoScaling::LaunchConfiguration",
+        "Properties" : {
+          "BlockDeviceMappings" : {"Fn::If" : ["EphemeralStorage",[
+            { "DeviceName" : "/dev/sdb", "VirtualName": "ephemeral0" },
+            { "DeviceName" : "/dev/sdc", "VirtualName": "ephemeral1" },
+            { "DeviceName" : "/dev/sdd", "VirtualName": "ephemeral2" },
+            { "DeviceName" : "/dev/sde", "VirtualName": "ephemeral3" },
+            { "DeviceName" : "/dev/sdf", "VirtualName": "ephemeral4" },
+            { "DeviceName" : "/dev/sdg", "VirtualName": "ephemeral5" },
+            { "DeviceName" : "/dev/sdh", "VirtualName": "ephemeral6" },
+            { "DeviceName" : "/dev/sdi", "VirtualName": "ephemeral7" },
+            { "DeviceName" : "/dev/sdj", "VirtualName": "ephemeral8" },
+            { "DeviceName" : "/dev/sdk", "VirtualName": "ephemeral9" },
+            { "DeviceName" : "/dev/sdl", "VirtualName": "ephemeral10" },
+            { "DeviceName" : "/dev/sdm", "VirtualName": "ephemeral11" }
+          ],[ 
+            { "DeviceName" : "/dev/sdb", 
+              "Ebs" : { "VolumeSize" : {"Ref" : "PersistentStorage"}, "DeleteOnTermination" : "True" } },
+            { "DeviceName" : "/dev/sdc", 
+              "Ebs" : { "VolumeSize" : {"Ref" : "PersistentStorage"}, "DeleteOnTermination" : "True" } },
+            { "DeviceName" : "/dev/sdd", 
+              "Ebs" : { "VolumeSize" : {"Ref" : "PersistentStorage"}, "DeleteOnTermination" : "True" } },
+            { "DeviceName" : "/dev/sde", 
+              "Ebs" : { "VolumeSize" : {"Ref" : "PersistentStorage"}, "DeleteOnTermination" : "True" } }
+          ]]},
+          "ImageId"        : { "Fn::FindInMap" : [ "AWSRegionVindex2AMI", { "Ref" : "AWS::Region" },
+                { "Fn::FindInMap" : [ "MapRVersion2Vindex", { "Ref" : "MapRVersion" }, "Vindex" ] } ] },
+          "SecurityGroups" : [ { "Fn::If" : [ "NewPrivateVPC", { "Ref" : "DefaultSecurityGroup" }, {"Ref" : "AWS::NoValue"} ] } ] ,
+          "InstanceType"   : { "Ref" : "ClusterNodeType" },
+          "SpotPrice" : { "Fn::If" : [ "OnDemandInstances", {"Ref" : "AWS::NoValue"}, { "Ref" : "InstanceSpotPrice" } ] },
+          "KeyName"        : { "Ref" : "KeyName" },
+          "AssociatePublicIpAddress" : "true",
+          "IamInstanceProfile" : { "Ref" : "InstanceProfile" },
+          "UserData": {
+            "Fn::Base64": { "Fn::Join": ["",[
+              "#!/bin/bash\n",
+              "\n", 
+              "function error_exit\n", 
+              "{\n", 
+              " /opt/aws/bin/cfn-signal -e 1 --stack ", {"Ref":"AWS::StackName"}, " --region ", {"Ref":"AWS::Region"}, " --resource ClusterNodes\n", 
+              " exit 1\n", 
+              "}\n",
+              "\n", 
+              "## Install and Update CloudFormation\n", 
+              "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n",
+              "\n", 
+              "[ ! -f /usr/bin/sshpass ] && yum install -y sshpass\n",
+              "## Signal that the node is up\n",
+               "/opt/aws/bin/cfn-signal -e 0 --stack ", {"Ref":"AWS::StackName"}, " --region ", {"Ref": "AWS::Region"}, " --resource ClusterNodes\n",
+              "\n", 
+              "## Wait for all nodes to come on-line\n",
+              "resourceStatus=$(aws cloudformation describe-stack-resources ",
+              "--region ", {"Ref": "AWS::Region"}, " ",
+              "--stack-name ", {"Ref":"AWS::StackName"}, " --logical-resource-id ClusterNodes ", 
+              "--query StackResources[].ResourceStatus --output text )\n",
+              "while [ \"$resourceStatus\" != \"CREATE_COMPLETE\" ]\n",
+              "do\n",
+              "  sleep 30\n",
+              "  resourceStatus=$(aws cloudformation describe-stack-resources ",
+              "--region ", {"Ref": "AWS::Region"}, " ",
+              "--stack-name ", {"Ref":"AWS::StackName"}, " --logical-resource-id ClusterNodes ", 
+              "--query StackResources[].ResourceStatus --output text )\n",
+              "done\n",
+              "\n",
+              "## Find the private IP of all the nodes launched by this template\n", 
+              "aws ec2 describe-instances --output text ",
+              "--region ", {"Ref": "AWS::Region"}, " ",
+              "--filters 'Name=instance-state-name,Values=running,stopped' ",
+              "--query 'Reservations[].Instances[].",
+              "[PrivateDnsName,AmiLaunchIndex,InstanceId,LaunchTime,Tags[?Key == `aws:cloudformation:stack-name`] | [0].Value ] ' ",
+              "| grep -w ", {"Ref":"AWS::StackName"}, " ",
+              "| sort -k 4 | awk '{print $1\" MAPRNODE\"NR-1\" \"$3\" \"$4}' > /tmp/maprhosts\n",
+              "\n",
+              "## Save off other cluster details in prep for configuration\n", 
+              "echo ", {"Ref" : "ClusterName"}, " > /tmp/mkclustername\n",
+              "echo ", {"Ref" : "MapREdition"}, " > /tmp/maprlicense\n",
+              "cp /tmp/maprlicense /tmp/maprlicensetype\n",
+              "sed -i 's/^Converged Community$/M3/g' /tmp/maprlicensetype\n",
+              "sed -i 's/^Enterprise$/M5/g' /tmp/maprlicensetype\n",
+              "sed -i 's/^Converged Enterprise$/M7/g' /tmp/maprlicensetype\n",
+              "echo ", {"Ref" : "MapRSecurity"}, " > /tmp/maprsecurecluster\n",
+              "[ \"", {"Ref" : "MapRSecurity"}, "\" = 'Disabled' ] && rm /tmp/maprsecurecluster\n",
+              "\n",
+              "## Tag the instance (now that we're sure of launch index\n",
+              "instance_id=$(curl -f http://169.254.169.254/latest/meta-data/instance-id)\n",
+              "launch_node=$(grep -w `hostname` /tmp/maprhosts | awk '{print $2}')\n",
+              "launch_index=${launch_node#*NODE}\n",
+              "if [ -n \"$instance_id\" ] ; then\n",
+              "  instance_tag=", {"Ref":"ClusterName"}, "-node${launch_index}\n",
+              "  aws ec2 create-tags", " --region ", {"Ref": "AWS::Region"}, " --resources $instance_id --tags Key=Name,Value=$instance_tag\n",
+              "fi\n",
+              "## Patch deployment scripts (if necessary)\n",
+              "MP_URL=https://s3.amazonaws.com/mapr-marketplace \n",
+              "PATCHES_URL=$MP_URL/patches_", { "Fn::FindInMap" : [ "MapRVersion2Vindex", { "Ref" : "MapRVersion" }, "Vindex" ] }, " \n",
+              "AMI_SBIN=/home/mapr/sbin \n",
+              "for f in $( cd $AMI_SBIN; ls ) ; do \n",
+              "  curl -f ${PATCHES_URL}/$f -o /tmp/$f \n",
+              "  if [ $? -eq 0 ] ; then \n",
+              "    cp -p ${AMI_SBIN}/${f} ${AMI_SBIN}/${f}.ami \n",
+              "    cp /tmp/${f} ${AMI_SBIN} \n",
+              "  fi\n",
+              "done \n",
+              "AMI_LICENSES=/home/mapr/licenses \n",
+              "for f in $( cd $AMI_LICENSES; ls ) ; do \n",
+              "  curl -f ${PATCHES_URL}/$f -o /tmp/$f \n",
+              "  if [ $? -eq 0 ] ; then \n",
+              "    cp /tmp/${f} ${AMI_LICENSES} \n",
+              "  fi\n",
+              "done \n",
+              "\n",
+              "# Now the patches that are _new_ to the AMI\n",
+              "for f in post-client-spec.sh update-eco-pkg.sh ; do \n",
+              "  curl -f ${PATCHES_URL}/$f -o /tmp/$f \n",
+              "  if [ $? -eq 0 ] ; then \n",
+              "    cp -p ${AMI_SBIN}/${f} ${AMI_SBIN}/${f}.ami \n",
+              "    cp /tmp/${f} ${AMI_SBIN} \n",
+              "    chmod a+x ${AMI_SBIN}/${f} \n",
+              "    chown --reference=${AMI_SBIN} ${AMI_SBIN}/${f} \n",
+              "  fi\n",
+              "done \n",
+              "\n",
+              "#/home/mapr/sbin/update-eco-pkg.sh drill spark spark-historyserver | tee /tmp/eco-pkg.log \n",
+              "\n",
+              "## Run the setup to start the various services and hadoop cluster\n",
+              "/home/mapr/sbin/deploy-mapr-ami.sh \n",
+              "/home/mapr/sbin/deploy-mapr-data-services.sh drill \n",
+              "/home/mapr/sbin/deploy-mapr-data-services.sh hiveserver \n",
+              "/home/mapr/sbin/deploy-mapr-data-services.sh spyglass \n",
+              "\n",
+              "## Open up ssh to allow direct login\n",
+              "#sed -i 's/ChallengeResponseAuthentication .*no$/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config\n",
+              "#service sshd restart\n",
+              "\n",
+              "## If all went well, signal success (must be done by ALL nodes)\n",
+              "/opt/aws/bin/cfn-signal -e 0 -r 'MapR Installation complete' '", { "Ref" : "ClusterCompleteHandle" }, "'\n",
+              "\n", 
+              "## Wait for all nodes to issue the signal\n",
+              "resourceStatus=$(aws cloudformation describe-stack-resources ",
+              "--region ", {"Ref": "AWS::Region"}, " ",
+              "--stack-name ", {"Ref":"AWS::StackName"}, " --logical-resource-id ClusterCompleteCondition ", 
+              "--query StackResources[].ResourceStatus --output text )\n",
+              "while [ \"$resourceStatus\" != \"CREATE_COMPLETE\" ]\n",
+              "do\n",
+              "  sleep 10\n",
+              "  resourceStatus=$(aws cloudformation describe-stack-resources ",
+              "--region ", {"Ref": "AWS::Region"}, " ",
+              "--stack-name ", {"Ref":"AWS::StackName"}, " --logical-resource-id ClusterCompleteCondition ", 
+              "--query StackResources[].ResourceStatus --output text )\n",
+              "done\n",
+              "\n",
+              "## Signal back information for outputs (now that all nodes are up) \n",
+              "/home/mapr/sbin/post-client-spec.sh '", { "Ref" : "ClientSpecWaitHandle" }, "'\n",
+              "/home/mapr/sbin/post-mcs-info.sh '", { "Ref" : "MCSWaitHandle" }, "'\n",
+              "/home/mapr/sbin/post-drill-info.sh '", { "Ref" : "DrillWaitHandle" }, "'\n",
+              "/home/mapr/sbin/post-monitoring-info.sh '", { "Ref" : "MonWaitHandle" }, "'\n",
+              "\n"
+            ]]}
+          }
+        }
+      }
+    },
+
+    "Outputs" : {
+        "ClientConfigDetails":
+        {
+            "Condition" : "EnableWaitConditions",
+            "Description": "CLDB nodes for use in client configuration",
+            "Value": { "Fn::GetAtt" : [ "ClientSpecWaitCondition" , "Data"] }
+        },
+        "ControlSystemConsole": 
+        {
+            "Condition" : "EnableWaitConditions",
+            "Description": "MapR Control System URL and Login",
+            "Value": { "Fn::GetAtt" : [ "MCSWaitCondition" , "Data"] } 
+        },
+        "DrillClusterAccess": 
+        {
+            "Condition" : "EnableWaitConditions",
+            "Description": "Drill console access and ODBC endpoint",
+            "Value": { "Fn::GetAtt" : [ "DrillWaitCondition" , "Data"] } 
+        },
+        "MonitoringClusterAccess":
+        {
+            "Condition" : "EnableWaitConditions",
+            "Description": "MapR monitoring UI access",
+            "Value": { "Fn::GetAtt" : [ "MonWaitCondition" , "Data"] }
+        },
+        "Subnet" : { "Value" : { "Fn::If" : [ "NewPrivateVPC", { "Ref" : "PublicSubnet" }, {"Ref" : "VpcSubnetId"} ] } }
+    }
+}
