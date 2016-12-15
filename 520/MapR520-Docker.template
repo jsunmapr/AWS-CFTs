@@ -1,7 +1,7 @@
 {
     "AWSTemplateFormatVersion" : "2010-09-09",
 
-    "Description" : "CloudFormation template to create a MapR Cluster for AWS Marketplace",
+    "Description" : "CloudFormation template to create a micro MapR cluster using Docker in a single AWS VM",
 
     "Parameters" : {
   
