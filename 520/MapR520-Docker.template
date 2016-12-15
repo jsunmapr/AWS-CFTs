@@ -9,7 +9,7 @@
            "Type" : "String",
            "Default" : "m4.4xlarge",
            "Description" : "Instance Type for MapR Cluster nodes; select m3/m4 or i2 instance types for us-west-1 and sa-east-1",
-           "AllowedValues" : [ "m3.large", "m3.xlarge", "m4.2xlarge", "m4.4xlarge", "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge", "i2.xlarge", "i2.2xlarge" ]
+           "AllowedValues" : [ "m3.2xlarge", "m4.2xlarge", "m4.4xlarge", "r3.2xlarge", "r3.4xlarge", "r4.2xlarge", "r4.4xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge", "i2.xlarge", "i2.2xlarge" ]
 ,
             "ConstraintDescription" : "Must be a valid EC2 instance type."
         },
