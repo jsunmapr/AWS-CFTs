@@ -83,14 +83,14 @@
         },
 
         "AWSRegionVindex2AMI" : {
-          "us-east-1"      : { "410" : "ami-262b6a4c", "500" : "ami-a39fccc9", "510" : "ami-558a0542", "520" : "ami-dae8fdcd", "Windows2012r2" : "ami-none" },
+          "us-east-1"      : { "410" : "ami-262b6a4c", "500" : "ami-a39fccc9", "510" : "ami-558a0542", "520" : "ami-8cd8cf9b", "Windows2012r2" : "ami-none" },
           "us-west-1"      : { "410" : "ami-5e442d3e", "500" : "ami-d6553fb6", "510" : "ami-f8266798", "Windows2012r2" : "ami-none" },
-          "us-west-2"      : { "410" : "ami-870f1ce6", "500" : "ami-c6332aa7", "510" : "ami-48814228", "520" : "ami-2a299d4a", "Windows2012r2" : "ami-none" },
-          "eu-central-1"   : { "410" : "ami-9bafbdf7", "500" : "ami-5b213e37", "510" : "ami-d17b8ebe", "520" : "ami-a71bdbc8", "Windows2012r2" : "ami-none" },
-          "eu-west-1"      : { "410" : "ami-93a206e0", "500" : "ami-d712bea4", "510" : "ami-76bada05", "520" : "ami-78e8c80b", "Windows2012r2" : "ami-none" },
+          "us-west-2"      : { "410" : "ami-870f1ce6", "500" : "ami-c6332aa7", "510" : "ami-48814228", "520" : "ami-bb9c2bdb", "Windows2012r2" : "ami-none" },
+          "eu-central-1"   : { "410" : "ami-9bafbdf7", "500" : "ami-5b213e37", "510" : "ami-d17b8ebe", "520" : "ami-be61a1d1", "Windows2012r2" : "ami-none" },
+          "eu-west-1"      : { "410" : "ami-93a206e0", "500" : "ami-d712bea4", "510" : "ami-76bada05", "520" : "ami-e22f0c91", "Windows2012r2" : "ami-none" },
           "ap-southeast-1" : { "410" : "ami-1238f971", "500" : "ami-9736f4f4", "510" : "ami-2003df43", "Windows2012r2" : "ami-none" },
-          "ap-southeast-2" : { "410" : "ami-d7ca93b4", "500" : "ami-da346eb9", "510" : "ami-none", "520" : "ami-77cff414", "Windows2012r2" : "ami-none" },
-          "ap-northeast-1" : { "410" : "ami-2aebc644", "500" : "ami-69013707", "510" : "ami-29e71e48", "520" : "ami-e5006b82", "Windows2012r2" : "ami-none" },
+          "ap-southeast-2" : { "410" : "ami-d7ca93b4", "500" : "ami-da346eb9", "510" : "ami-none", "520" : "ami-cb9da6a8", "Windows2012r2" : "ami-none" },
+          "ap-northeast-1" : { "410" : "ami-2aebc644", "500" : "ami-69013707", "510" : "ami-29e71e48", "520" : "ami-9ecda6f9", "Windows2012r2" : "ami-none" },
           "sa-east-1"      : { "410" : "ami-00a6236c", "500" : "ami-ab38bfc7", "510" : "ami-none", "Windows2012r2" : "ami-none" }
         },
 
