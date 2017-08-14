@@ -25,10 +25,10 @@
 
         "PersistentStorage": {
           "Type": "Number",
-          "Default": "20",
+          "Default": "5",
           "Description" : "Allocated EBS storage for each block device (in GB; 5 drives)",
-          "MinValue": "6",
-          "MaxValue": "10",
+          "MinValue": "2",
+          "MaxValue": "8",
           "ConstraintDescription" : "No more than 10 GB per device."
         },
 
